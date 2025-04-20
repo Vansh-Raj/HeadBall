@@ -12,6 +12,10 @@ export class HeadballScene extends Phaser.Scene {
   private aiScore = 0;
   private canJump = true;
   private goalCooldown = false;
+  private lastGoalScorer: 'player' | 'ai' | null = null;
+  private gameOver = false;
+
+
 
   constructor() {
     super('HeadballScene');
@@ -39,23 +43,24 @@ export class HeadballScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.gameOver) return;
+  
     this.handlePlayerMovement();
     this.handleAI();
     
-    // Simple goal detection based on position
     if (!this.goalCooldown) {
       if (this.ball.x < 90 && this.ball.y > 380 && this.ball.y < 590) {
         console.log("Left goal!");
         this.handleGoal('ai');
       }
-      
+  
       if (this.ball.x > 710 && this.ball.y > 380 && this.ball.y < 590) {
         console.log("Right goal!");
         this.handleGoal('player');
       }
     }
   }
-
+  
   private createGround() {
     this.ground = this.add.rectangle(400, 590, 800, 20, 0x888888);
     this.physics.add.existing(this.ground, true);
@@ -194,28 +199,35 @@ export class HeadballScene extends Phaser.Scene {
   }
 
   private handleGoal(scorer: 'player' | 'ai') {
-    if (this.goalCooldown) return;
-    
+    if (this.goalCooldown || this.lastGoalScorer === scorer) return;
+  
     this.goalCooldown = true;
+    this.lastGoalScorer = scorer;
+  
     this.time.delayedCall(1000, () => {
       this.goalCooldown = false;
+      this.lastGoalScorer = null;
     });
-
-    // Direct scoring - no conditional needed
+  
     if (scorer === 'player') {
       this.playerScore++;
     } else {
       this.aiScore++;
     }
-    
+  
     this.updateScoreText();
 
-    // Reset positions
-    this.ball.setPosition(400, 300).setVelocity(0, 0);
-    this.player.setPosition(150, 300);
-    this.ai.setPosition(650, 300);
-  }
+this.ball.setPosition(400, 300).setVelocity(0, 0);
+this.player.setPosition(150, 300);
+this.ai.setPosition(650, 300);
 
+// Check for game over
+if (this.playerScore >= 5 || this.aiScore >= 5) {
+  this.endGame(scorer);
+}
+
+  }
+  
   private createScoreText() {
     this.scoreText = this.add.text(400, 30, '', {
       fontSize: '32px',
@@ -244,4 +256,33 @@ export class HeadballScene extends Phaser.Scene {
     // Right zone
     graphics.strokeRect(710, 380, 60, 210);
   }
+  private endGame(winner: 'player' | 'ai') {
+    this.gameOver = true;
+  
+    const winnerText = winner === 'player' ? 'Player Wins!' : 'AI Wins!';
+    const message = this.add.text(400, 300, winnerText, {
+      fontSize: '48px',
+      color: '#ffff00',
+      fontFamily: 'Arial Black',
+      stroke: '#000000',
+      strokeThickness: 8
+    }).setOrigin(0.5).setAlpha(0);
+  
+    // Animate text fade in
+    this.tweens.add({
+      targets: message,
+      alpha: 1,
+      duration: 1000,
+      ease: 'Power2',
+    });
+  
+    // Optional: Stop ball and players
+    this.ball.setVelocity(0, 0).setCollideWorldBounds(false);
+    this.player.setVelocity(0, 0);
+    this.ai.setVelocity(0, 0);
+  
+    // Optional: Restart game after delay
+    // this.time.delayedCall(5000, () => this.scene.restart());
+  }
+  
 }
